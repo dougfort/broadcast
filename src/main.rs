@@ -21,8 +21,11 @@ async fn main()  -> Result<(), Error> {
     let mut join_handles = vec![];
     for actor_id in 1..=ACTOR_COUNT {
         let broadcast_tx = broadcast_tx.clone();
+        let broadcast_rx = broadcast_tx.subscribe();
         let join_handle = tokio::spawn(async move {
-            actor(actor_id, broadcast_tx).await;
+            actor(actor_id, broadcast_tx, broadcast_rx).await?;
+
+            Ok::<(), Error>(())
         });
         join_handles.push(join_handle);
     }
@@ -39,9 +42,18 @@ async fn main()  -> Result<(), Error> {
     Ok(())
 }
 
-async fn actor(actor_id: usize, broadcast_tx: broadcast::Sender::<String>) {
-    let mut broadcast_rx = broadcast_tx.subscribe();
-    broadcast_tx.send(format!("from actor {}", actor_id)).unwrap();
-    let data = broadcast_rx.recv().await.unwrap();
-    tracing::debug!("actor: {}; data = {}", actor_id, data);
+async fn actor(
+    actor_id: usize, 
+    broadcast_tx: broadcast::Sender::<String>,
+    broadcast_rx: broadcast::Receiver::<String>,
+) -> Result<(), Error> {
+    let mut broadcast_rx = broadcast_rx;
+    broadcast_tx.send(format!("1 from actor {}", actor_id))?;
+    for _ in 0..2 {
+        let data = broadcast_rx.recv().await?;
+        tracing::debug!("actor: {}; data = {}", actor_id, data);
+    }
+
+    tracing::debug!("actor: {} terminates", actor_id);
+    Ok(())
 }
