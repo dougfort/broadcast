@@ -1,10 +1,11 @@
 use anyhow::Error;
+use std::sync::Arc;
 use tokio::sync::broadcast;
 
 mod signal;
 
 #[tokio::main]
-async fn main()  -> Result<(), Error> {
+async fn main() -> Result<(), Error> {
     // Set the RUST_LOG, if it hasn't been explicitly defined
     if std::env::var_os("RUST_LOG").is_none() {
         std::env::set_var("RUST_LOG", "broadcast=debug")
@@ -17,6 +18,7 @@ async fn main()  -> Result<(), Error> {
     tracing::info!("program starts");
 
     let (broadcast_tx, _) = broadcast::channel::<String>(BROADCAST_CHANNEL_SIZE);
+    let broadcast_tx = Arc::new(broadcast_tx);
 
     let mut join_handles = vec![];
     for actor_id in 1..=ACTOR_COUNT {
@@ -43,9 +45,9 @@ async fn main()  -> Result<(), Error> {
 }
 
 async fn actor(
-    actor_id: usize, 
-    broadcast_tx: broadcast::Sender::<String>,
-    broadcast_rx: broadcast::Receiver::<String>,
+    actor_id: usize,
+    broadcast_tx: Arc<broadcast::Sender<String>>,
+    broadcast_rx: broadcast::Receiver<String>,
 ) -> Result<(), Error> {
     let mut broadcast_rx = broadcast_rx;
     broadcast_tx.send(format!("1 from actor {}", actor_id))?;
