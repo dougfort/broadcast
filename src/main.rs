@@ -1,8 +1,8 @@
 use anyhow::Error;
-use std::sync::Arc;
-use tokio::sync::{broadcast, watch};
 use rand::Rng;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::{broadcast, watch};
 
 mod signal;
 
@@ -14,7 +14,7 @@ async fn main() -> Result<(), Error> {
     }
     tracing_subscriber::fmt::init();
 
-    const ACTOR_COUNT: usize = 2;
+    const ACTOR_COUNT: usize = 10;
     const BROADCAST_CHANNEL_SIZE: usize = ACTOR_COUNT;
 
     tracing::info!("program starts");
@@ -35,7 +35,7 @@ async fn main() -> Result<(), Error> {
 
             Ok::<(), Error>(())
         });
-        join_handles.push(join_handle);
+        join_handles.push((actor_id, join_handle));
     }
 
     tracing::info!("waiting for shutdown signal");
@@ -44,9 +44,9 @@ async fn main() -> Result<(), Error> {
     halt = true;
     halt_tx.send(halt)?;
 
-    for join_handle in join_handles {
+    for (actor_id, join_handle) in join_handles {
         let result = join_handle.await?;
-        tracing::debug!("join result = {:?}", result);
+        tracing::debug!("actor: {:03}; join result = {:?}", actor_id, result);
     }
 
     tracing::info!("progam terminates normally");
@@ -59,7 +59,8 @@ async fn actor(
     mut broadcast_rx: broadcast::Receiver<String>,
     mut halt_rx: watch::Receiver<bool>,
 ) -> Result<(), Error> {
-    let mut halt = *halt_rx.borrow(); 
+    let mut halt = *halt_rx.borrow();
+    let mut count = 0;
 
     while !halt {
         let sleep_interval = {
@@ -68,13 +69,26 @@ async fn actor(
         };
         tokio::select! {
             _ = tokio::time::sleep(sleep_interval) => {
-                broadcast_tx.send(format!("from actor {}", actor_id))?;
+                count += 1;
+                broadcast_tx.send(format!("{:>5} from actor {:03}", count, actor_id))?;
             }
             _ = halt_rx.changed() => {halt = *halt_rx.borrow()}
             recv_result = broadcast_rx.recv() => {
-                let data = recv_result?;
-                tracing::debug!("actor: {}; data = {}", actor_id, data);
-            }
+                match recv_result {
+                    Ok(data) => {
+                        tracing::debug!("actor: {:03}; data = {}", actor_id, data)
+                    }
+                    Err(error) => match error {
+                        broadcast::error::RecvError::Closed => {
+                            tracing::info!("actor: {:03}; connection closed", actor_id);
+                            halt = true;
+                        },
+                        broadcast::error::RecvError::Lagged(lag_count) => {
+                            tracing::warn!("actor: {:03}; lagged by {}", actor_id, lag_count);
+                        }
+                    }
+                }
+             }
         }
     }
 
