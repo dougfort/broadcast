@@ -16,7 +16,13 @@ Using a [CRDT Map](https://docs.rs/crdts/7.0.0/crdts/map/struct.Map.html) to exe
 
 This is an extension of the [reset remove example](https://github.com/rust-crdt/rust-crdt/blob/master/examples/reset_remove.rs) in the [rust-crdt](https://github.com/rust-crdt/rust-crdt) repository.
 
-We map a person's name to the [set](https://docs.rs/crdts/7.0.0/crdts/orswot/index.html)  of the names of their friends.
+# Scenario
+
+We spawn [asynchronous tasks](https://docs.rs/tokio/0.2.18/tokio/fn.spawn.html) to represent [Actors](https://docs.rs/crdts/7.0.0/crdts/trait.Actor.html)
+
+Actors subscribe to a [broadcast](https://docs.rs/tokio/1.13.0/tokio/sync/broadcast/index.html)
+
+The Actors map a person's name to the [set](https://docs.rs/crdts/7.0.0/crdts/orswot/index.html)  of the names of their friends.
 
 ```rustlang
 type ActorId = usize;
