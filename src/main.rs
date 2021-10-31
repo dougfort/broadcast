@@ -20,13 +20,13 @@ async fn main() -> Result<(), Error> {
 
     // TODO: #1 load config from environment and/or command line
 
-    const ACTOR_COUNT: usize = 2;
+    const ACTOR_COUNT: usize = 10;
     const BROADCAST_CHANNEL_SIZE: usize = ACTOR_COUNT;
     const NAMES_PATH: &str = "data/names.txt";
 
     tracing::info!("program starts");
 
-    let (broadcast_tx, _) = broadcast::channel::<String>(BROADCAST_CHANNEL_SIZE);
+    let (broadcast_tx, _) = broadcast::channel::<(usize, String)>(BROADCAST_CHANNEL_SIZE);
     let broadcast_tx = Arc::new(broadcast_tx);
     let names = Arc::new(names::Names::new(NAMES_PATH)?);
 
@@ -65,8 +65,8 @@ async fn main() -> Result<(), Error> {
 async fn actor(
     actor_id: usize,
     names: Arc<names::Names>,
-    broadcast_tx: Arc<broadcast::Sender<String>>,
-    mut broadcast_rx: broadcast::Receiver<String>,
+    broadcast_tx: Arc<broadcast::Sender<(usize, String)>>,
+    mut broadcast_rx: broadcast::Receiver<(usize, String)>,
     mut halt_rx: watch::Receiver<bool>,
 ) -> Result<(), Error> {
     let mut halt = *halt_rx.borrow();
@@ -79,29 +79,21 @@ async fn actor(
         };
         tokio::select! {
             _ = tokio::time::sleep(sleep_interval) => {
-                let key = names.choose()?;
-                let value = names.choose()?;
-                tracing::debug!("Actor {:03}: adding {} to key {}", actor_id, value, key);
-                let read_ctx = friend_map.len(); // we read anything from the map to get a add context
-                let op = friend_map.update(
-                    key.as_str(),
-                    read_ctx.derive_add_ctx(actor_id),
-                    |set, ctx| {
-                        set.add(value, ctx)
-                    }
-                );
+                let op = mutate_map(actor_id, names.clone(), &friend_map)?;
                 friend_map.apply(op);
                 let map_string = serde_json::to_string(&friend_map)?;
-                broadcast_tx.send(map_string)?;
+                broadcast_tx.send((actor_id, map_string))?;
             }
             _ = halt_rx.changed() => {halt = *halt_rx.borrow()}
             recv_result = broadcast_rx.recv() => {
                 match recv_result {
-                    Ok(data) => {
-                        tracing::debug!("actor: {:03}; received {} bytes", actor_id, data.len());
-                        let incoming_map: FriendMap = serde_json::from_str(&data)?;
-                        friend_map.validate_merge(&incoming_map)?;
-                        friend_map.merge(incoming_map);
+                    Ok((incoming_actor_id, incoming_data)) => {
+                        if incoming_actor_id != actor_id {
+                            tracing::debug!("Actor: {:03}; received {} bytes from Actor {:03}", actor_id, incoming_data.len(), incoming_actor_id);
+                            let incoming_map: FriendMap = serde_json::from_str(&incoming_data)?;
+                            friend_map.validate_merge(&incoming_map)?;
+                            friend_map.merge(incoming_map);
+                        }
                     }
                     Err(error) => match error {
                         broadcast::error::RecvError::Closed => {
@@ -119,4 +111,22 @@ async fn actor(
 
     tracing::debug!("actor: {} terminates", actor_id);
     Ok(())
+}
+
+fn mutate_map(
+    actor_id: usize,
+    names: Arc<names::Names>,
+    friend_map: &FriendMap,
+) -> Result<crdts::map::Op<String, Orswot<String, usize>, usize>, Error> {
+    let key = names.choose()?;
+    let value = names.choose()?;
+    tracing::debug!("Actor {:03}: adding {} to key {}", actor_id, value, key);
+    let read_ctx = friend_map.len(); // we read anything from the map to get a add context
+    let op = friend_map.update(
+        key.as_str(),
+        read_ctx.derive_add_ctx(actor_id),
+        |set, ctx| set.add(value, ctx),
+    );
+
+    Ok(op)
 }
