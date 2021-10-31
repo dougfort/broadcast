@@ -8,7 +8,8 @@ use tokio::sync::{broadcast, watch};
 mod names;
 mod signal;
 
-type FriendMap = Map<String, Orswot<String, usize>, usize>;
+type ActorId = usize;
+type FriendMap = Map<String, Orswot<String, ActorId>, ActorId>;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
