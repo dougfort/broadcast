@@ -16,7 +16,7 @@ Using a [CRDT Map](https://docs.rs/crdts/7.0.0/crdts/map/struct.Map.html) to exe
 
 This is an extension of the [reset remove example](https://github.com/rust-crdt/rust-crdt/blob/master/examples/reset_remove.rs) in the [rust-crdt](https://github.com/rust-crdt/rust-crdt) repository.
 
-# Scenario
+## Scenario
 
 We spawn [asynchronous tasks](https://docs.rs/tokio/0.2.18/tokio/fn.spawn.html) to represent [Actors](https://docs.rs/crdts/7.0.0/crdts/trait.Actor.html)
 
