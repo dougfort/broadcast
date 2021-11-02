@@ -123,9 +123,14 @@ fn remove_value(
     let key = keys.choose(&mut rng).unwrap();
     let set_ctx = friend_map.get(key);
     let set = set_ctx.val.unwrap();
-    let items: Vec<_> = set.iter().collect(); 
-    let val_ctx = items.choose(&mut rng).unwrap();
-    let value = val_ctx.val.clone();
+    let value = {
+        // if 'set' is empty, try to remove "", just so we have an Op
+        let items: Vec<_> = set.iter().collect(); 
+        match items.choose(&mut rng) {
+            Some(val_ctx) => val_ctx.val.clone(),
+            None => "".to_string()
+        }
+    };
     tracing::debug!("Actor {:03}: removing key value {} from {}", actor_id, value, key);
     let op = friend_map.update(
         key.as_str(),
