@@ -71,6 +71,16 @@ async fn actor(
 ) -> Result<(), Error> {
     let mut halt = *halt_rx.borrow();
     let mut friend_map: friends::FriendMap = Map::new();
+
+    // TODO: #2 load the action list from config
+    let action_list: mutate::ActionList = vec![
+        (mutate::Action::AddKey, 10),
+        (mutate::Action::AddValue, 40),   
+        (mutate::Action::RemoveKey, 10),
+        (mutate::Action::RemoveValue, 40),    
+    ];
+    let action_generator = mutate::ActionGenerator::new(action_list)?;
+
     let mut trans_count: usize = 0;
     let mut after_count: usize = 0;
 
@@ -81,7 +91,12 @@ async fn actor(
         };
         tokio::select! {
             _ = tokio::time::sleep(sleep_interval) => {
-                let op = mutate::mutate_map(actor_id, names.clone(), &friend_map)?;
+                let op = mutate::mutate_map(
+                    actor_id, 
+                    names.clone(), 
+                    &friend_map, 
+                    &action_generator,
+                )?;
                 friend_map.apply(op);
                 let map_string = serde_json::to_string(&friend_map)?;
                 broadcast_tx.send((actor_id, map_string))?;
