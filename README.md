@@ -70,11 +70,11 @@ cargo run
 
 ## Verification
 
-Verification is difficult, becasue the system is never at rest and there is no easy 
+Verification is difficult, becasue the system is never at rest and there is no easy
 way to poll the active agents for their current state.
 
 After merging an incoming map, we check that the merged map is equal to the
-incoming map. 
+incoming map.
 
 ```rustlang
     trans_count += 1;
@@ -88,7 +88,7 @@ incoming map.
     let percentage: f64 = (after_count as f64 / trans_count as f64) * 100.0;
 ```
 
-We monitor the percentage of cases where the maps are equal. This is not a 
+We monitor the percentage of cases where the maps are equal. This is not a
 perfect test, but it provides some indication. If the percentage never decreases
 and maintains a high level, we consider the test acceptable.
 
