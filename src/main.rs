@@ -1,3 +1,5 @@
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use anyhow::Error;
 use crdts::{CmRDT, CvRDT, Map};
 use rand::Rng;
@@ -12,11 +14,18 @@ mod signal;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    
+
     // Set the RUST_LOG, if it hasn't been explicitly defined
     if std::env::var_os("RUST_LOG").is_none() {
         std::env::set_var("RUST_LOG", "broadcast=debug")
     }
-    tracing_subscriber::fmt::init();
+
+    let console_layer = console_subscriber::spawn();
+    tracing_subscriber::registry()
+        .with(console_layer)
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
     // TODO: #1 load config from environment and/or command line
 
